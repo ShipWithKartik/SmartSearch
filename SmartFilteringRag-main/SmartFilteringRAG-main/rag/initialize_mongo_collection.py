@@ -1,8 +1,9 @@
-import json
-import logging
-import os
+from dotenv import load_dotenv
+load_dotenv()
 
-from langchain_openai import OpenAIEmbeddings
+import logging
+
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.vectorstores import MongoDBAtlasVectorSearch
 
 from rag.config_loader import config
@@ -24,15 +25,7 @@ def initialize_data():
 
     docs = get_input_data()
 
-    openai_api_key = os.getenv("OPEN_AI_API_KEY")
-    openai_api_base = os.getenv("OPEN_API_BASE")
-
-    # default_headers is optional
-    default_headers = os.getenv("OPEN_API_DEFAULT_HEADERS")
-    default_headers = json.loads(default_headers) if default_headers else None
-
-    embeddings = OpenAIEmbeddings(model=config["embedding_model"], openai_api_key=openai_api_key, openai_api_base=openai_api_base,
-                                  default_headers=default_headers)
+    embeddings = HuggingFaceEmbeddings(model_name=config["embedding_model"])
 
     collection = get_mongo_collection(db_name=database_name, collection_name=collection_name)
 
@@ -45,7 +38,8 @@ def initialize_data():
         filter_fields_with_datatype={
             "rating": "number",
             "release_date": "token",
-            "genre": "token"
+            "genre": "token",
+            "director": "token"
         }
     )
 

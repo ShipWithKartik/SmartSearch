@@ -3,7 +3,8 @@ import logging
 import os
 
 import fire
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_openai import ChatOpenAI
+from langchain_huggingface import HuggingFaceEmbeddings
 
 from rag.config_loader import config
 from rag.metadata_filter import MetadataFilter
@@ -28,10 +29,9 @@ def generate_response(queries):
     default_headers = os.getenv("OPEN_API_DEFAULT_HEADERS")
     default_headers = json.loads(default_headers) if default_headers else None
 
-    llm = ChatOpenAI(model=config["model"], openai_api_key=openai_api_key, openai_api_base=openai_api_base,
+    llm = ChatOpenAI(model=config["model"], max_tokens=1024, openai_api_key=openai_api_key, openai_api_base=openai_api_base,
                      default_headers=default_headers)
-    embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key, openai_api_base=openai_api_base,
-                                      default_headers=default_headers)
+    embeddings = HuggingFaceEmbeddings(model_name=config["embedding_model"])
 
     system_prompt = """Use the following pieces of context to answer the user question in subsequent messages.
     The context was retrieved from a knowledge database and you should use only the facts from the context to answer.

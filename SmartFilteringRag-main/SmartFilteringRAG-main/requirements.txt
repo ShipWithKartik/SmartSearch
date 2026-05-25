@@ -6,3 +6,7 @@ langchain-community==0.2.4
 lark==1.1.9
 PyYAML==6.0.1
 fire==0.6.0
+streamlit>=1.35.0
+python-dotenv>=1.0.0
+langchain-huggingface>=0.0.3
+sentence-transformers>=2.7.0

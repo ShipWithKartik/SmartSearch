@@ -47,6 +47,11 @@ def get_docs_metadata():
         AttributeInfo(
             name="rating", description="A 1-10 rating for the movie", type="float"
         ),
+        AttributeInfo(
+            name="director",
+            description="The director of the movie, e.g. 'Christopher Nolan', 'Satoshi Kon', 'Greta Gerwig'",
+            type="string",
+        ),
     ]
     document_content_description = "Brief summary of a movie"
 

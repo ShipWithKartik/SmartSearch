@@ -1,166 +1,459 @@
-# SmartFilteringRAG
+# 🔎 SmartFilteringRAG — Intelligent Metadata-Aware Vector Search
 
-## Introduction
+> **Natural language in → Smart filtered results out.**  
+> Ask questions like *"recommend a latest anime movie"* and the system automatically builds MongoDB filters, resolves time ranges, and runs vector search — all in one pipeline.
 
-**Ever searched for "old black and white comedies" only to be bombarded with a mix of modern action flicks?** Frustrating, right? That's the challenge with traditional search engines - they often struggle to understand the nuances of our queries, leaving us wading through irrelevant results.
+---
 
-This is where Smart Filtering comes in. It's a game-changer that uses metadata and vector search to deliver search results that truly match your intent. Imagine finding exactly the classic comedies you crave, without the hassle.
+## 📋 Table of Contents
 
-We will dive into what Smart Filtering is, how it works, and why it's essential for building better search experiences. Let's uncover the magic behind this technology and explore how it can revolutionize the way you search.
+- [1. Problem](#1-problem)
+- [2. Proposed Solution](#2-proposed-solution)
+- [3. How It Works — Full Pipeline](#3-how-it-works--full-pipeline)
+- [4. Implementation](#4-implementation)
+- [5. Concepts Used](#5-concepts-used)
+- [6. Final Results](#6-final-results)
+- [7. How to Run This Project](#7-how-to-run-this-project)
 
-## Understanding Vector Search
+---
 
-Vector search is a powerful tool that helps computers understand the meaning behind data, not just the words themselves. Instead of matching keywords, it focuses on the underlying concepts and relationships. Imagine searching for "dog" and getting results that include "puppy," "canine," and even images of dogs. That's the magic of vector search! 
+## 1. Problem
 
-How does it work? Well, it transforms data into mathematical representations called vectors. These vectors are like coordinates on a map, and similar data points are closer together in this vector space. When you search for something, the system finds the vectors closest to your query, giving you results that are semantically similar.
+### The Limitation of Plain Vector Search
 
-While vector search is fantastic at understanding context, it sometimes falls short when it comes to simple filtering tasks. For instance, finding all movies released before 2000 requires precise filtering, not just semantic understanding. This is where Smart Filtering comes in to complement vector search.
+Traditional vector search (semantic search) works great for finding **conceptually similar** documents. But it completely ignores **structured constraints** that users naturally express:
 
-# The Challenge Of Semantic Search
+| User Query | What They Mean | What Plain Vector Search Does |
+|-----------|----------------|-------------------------------|
+| *"anime movies released before 2010"* | Genre = anime **AND** date < 2010 | Searches for semantically similar text — might return a 2023 action movie |
+| *"highest rated thriller"* | Genre = thriller, sort by rating | Returns any movie about thrillers, regardless of actual rating |
+| *"latest Apple electronics under $500"* | Brand = Apple, category = Electronics, price < 500 | Matches text similarity to "Apple electronics" — might return a $3000 laptop |
 
-While vector  brings us closer to understanding the true meaning of queries, there's still a gap between what users want and what search engines deliver. Complex search queries like "earliest comedy movies before 2000" can still be a challenge. Semantic search might understand the concepts of "comedy" and "movies," but it might struggle with the specifics of "earliest" and "before 2000."
+### The Core Issue
 
-This is where the results start to get messy. We might get a mix of old and new comedies, or even dramas that were mistakenly included. To truly satisfy users, we need a way to refine these search results and make them more precise. That's where pre-filters come into play.
+Users ask questions with **two types of intent mixed together**:
 
-![1_image_0.png](images/metadata_filtering.png)
+1. **Semantic intent** — *what* they're looking for (conceptual meaning)
+2. **Structured constraints** — *filters* on specific fields (dates, categories, prices, ratings)
 
-Smart Filtering is the solution to this challenge. It's a technique that uses a dataset's metadata to create specific filters, refining search results and making them more accurate and efficient. By analyzing the information about your data, like its structure, content, and attributes, Smart Filtering can identify relevant criteria to filter your search.
+Plain vector search only handles #1. The structured constraints get lost.
 
-Imagine searching for "comedy movies released before 2000." Smart Filtering would use metadata like genre, release date, and potentially even plot keywords to create a filter that only includes movies matching those criteria. This way, you get a list of exactly what you want, without the irrelevant noise. 
+### Follow-Up Queries Are Even Harder
 
-Let's dive deeper into how Smart Filtering works in the next section.
+Real users don't ask one-shot questions. They have **conversations**:
 
-
-## How Smart Filtering Works
-
-Smart Filtering is a multi-step process that involves extracting information from your data, analyzing it, and creating specific filters based on your needs. Let's break it down:
-- **Metadata Extraction:** The first step is to gather relevant information about your data. This includes details like:
-    - Data structure: How is the data organized (e.g., tables, documents)? 
-    - Attributes: What kind of information is included (e.g., title, description, release date)?
-    - Data types: What format is the data in (e.g., text, numbers, dates)?
-
-- **Pre-filter Generation:** Once you have the metadata, you can start creating pre-filters.
-These are specific conditions that data must meet to be included in the search results. For example, if you're searching for comedy movies released before 2000, you might create pre-filters for:
-    - Genre: comedy 
-    - Release date: before 2000
-
-- **Integration with Vector Search:** The final step is to combine these pre-filters with your vector search. This ensures that the vector search only considers data points that match your pre-defined criteria.
-
-By following these steps, Smart Filtering significantly improves the accuracy and efficiency of your search results.
-
-## Understanding the Architecture
-- **Metadata Extraction:** For the purpose of simplifying things, we will be using sample data and manually defining the metadata. Refer: [get_docs_metadata](rag/utils/prepare_test_data.py) in `prepare_test_data.py`.
-
-
-- **Pre-filter Generation:** We will generate the pre-filters in two steps. 
-  - Step 1: Metadata based Filter
-  
-    This step includes generating a filter based on the metadata. We will pass the user query and the metadata to a LLM and generate the metadata filter.
-    
-    We will use the [query_constructor](rag/metadata_filter.py) that is initialized with this [DEFAULT_SCHEMA_PROMPT](rag/prompts.py).
-    > Note: Update the prompt and the few shot examples as per your use case.
-    
-    For example: If the metadata has `genre` and `release_date`, and user asks for `action` genre movies released before 2020, then we can use LLM to generate a filter like below:   
-      ```{"$and": [{"genre": {"$in": ["anime"]}}, {"release_date": {"$lt": "2024-01-01"}}]}```
-  - Step 2: Time based filtering 
-  
-    In this step, we will handle the cases where user asks for `latest`, `most recent`, `earliest` type of information. We will have to query the actual data to fetch this information.
-    We will use LLM Agent in this step to query the mongodb collection using the executor tool: [QueryExecutorMongoDBTool](rag/tools.py)
-    We are generating the time based filter in [generate_time_based_filter](rag/metadata_filter.py).
-    We will also use the pre_filter generated in the first step in the `$match` in the aggregation stage.
-    For example: If the user wants the latest movie, LLM agent will run below aggregation query using executor tool:
-    ```
-    Invoking: `mongo_db_executor` with `{'pipeline': '[{"$match": {"$and": [{"genre": {"$in": ["anime"]}}, {"release_date": {"$lt": "2024-01-01"}}]}}, { "$sort": { "release_date": -1 } }, { "$limit": 1 }, { "$project": { "release_date": 1 } }]'}`
-    ```
-
-
-- **Integration with Vector Search:** The generated pre-filter will be used with MongoDBAtlasVectorSearch retriever:
-  ```bash
-  retriever = vectorstore.as_retriever(
-            search_kwargs={'pre_filter': pre_filter}
-        )
-  ```  
-
-
-## Project Setup
-
-Create a new python environment
-```bash
-python3 -m venv env
-source env/bin/activate
 ```
-Install the requirements
-```bash
-pip3 install -r requirements.txt
+User: "Show me anime movies"          → Gets results
+User: "What about before 1990?"       → Wants to KEEP anime filter, ADD date filter
+User: "Directed by Satoshi Kon?"      → Wants to KEEP anime + date, ADD director filter
 ```
-Set the configurations in [config.yaml](config/config.yaml)
+
+Without conversation memory, each query starts from scratch and loses all prior context.
+
+---
+
+## 2. Proposed Solution
+
+**SmartFilteringRAG** solves this by adding an intelligent **pre-filtering layer** before vector search. The system:
+
+1. **Understands** the user's natural language query using an LLM
+2. **Extracts** structured metadata filters (genre, date, price, etc.)
+3. **Resolves** time-based queries ("latest", "most recent", "oldest")
+4. **Remembers** conversation context and carries filters forward
+5. **Searches** with both metadata filters AND semantic similarity combined
+
+### Key Innovation
+
+Instead of choosing between *keyword search* and *vector search*, SmartFilteringRAG uses **both together**:
+
+```
+User Query → LLM extracts filters → MongoDB Atlas pre-filter → Vector search on filtered subset
+```
+
+This means you get the **precision of structured filtering** combined with the **recall of semantic search**.
+
+---
+
+## 3. How It Works — Full Pipeline
+
+### High-Level Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    USER QUERY                                │
+│            "recommend latest anime movie"                    │
+└──────────────────────┬───────────────────────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────────────────────┐
+│  STEP 0: QUERY RESOLVER (Multi-Turn Memory)                  │
+│  • Is this a follow-up or fresh query?                       │
+│  • If follow-up: rewrite into self-contained query           │
+│  • Carries forward filters from previous turns               │
+└──────────────────────┬───────────────────────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────────────────────┐
+│  STEP 1: QUERY CONSTRUCTOR (Metadata Filter Generation)      │
+│  • LLM analyzes the query against known metadata schema      │
+│  • Generates structured filter: {genre: {$in: ["anime"]}}   │
+│  • Rewrites query to remove filter parts: "recommend movie"  │
+└──────────────────────┬───────────────────────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────────────────────┐
+│  STEP 2: TIME RANGE CONSTRUCTOR                              │
+│  • Detects temporal keywords: "latest", "most recent", etc.  │
+│  • Queries MongoDB to find actual date boundaries            │
+│  • Adds date filter: {release_date: {$gte: "2023-01-01"}}   │
+│  • Merges with Step 1 filters via $and                       │
+└──────────────────────┬───────────────────────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────────────────────┐
+│  STEP 3: VECTOR SEARCH (MongoDB Atlas)                       │
+│  • Applies merged pre-filter to narrow candidate set         │
+│  • Runs kNN vector search on filtered documents only         │
+│  • Returns top-k semantically similar results                │
+└──────────────────────┬───────────────────────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────────────────────┐
+│  RESULTS with full transparency                              │
+│  • Retrieved documents displayed as cards                    │
+│  • Filter panel shows what the system understood             │
+│  • Latency breakdown for each step                           │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Step-by-Step Walkthrough
+
+#### Step 0 — Query Resolution (Conversation Memory)
+
+When the user sends a query, the system first checks if it's a **follow-up** to a previous question:
+
+- **Fresh query** (e.g., "show me anime movies") → runs the full pipeline normally
+- **Follow-up with keep_all** (e.g., "show me more") → skips filter generation, reuses previous filters
+- **Follow-up with modify** (e.g., "what about before 1990?") → rewrites to "anime movies released before 1990" and runs the pipeline with this self-contained query
+
+The resolver uses an LLM with **6 few-shot examples** covering common follow-up patterns. It outputs:
+- `is_followup`: boolean
+- `filter_action`: "fresh" | "keep_all" | "modify"
+- `resolved_query`: the rewritten self-contained query
+
+#### Step 1 — Query Constructor (Metadata Filter Generation)
+
+The Query Constructor uses LangChain's `load_query_constructor_runnable` which:
+
+1. Takes the **metadata schema** (field names, types, descriptions) and the query
+2. Generates a **StructuredQuery** object containing a filter expression and a rewritten query
+3. The **MongoDBAtlasTranslator** converts this into a MongoDB-compatible `$match` filter
+4. `enforce_constraints()` validates the filter structure
+
+**Example:**
+
+```
+Input:  "recommend an anime movie with rating above 8"
+Output: 
+  filter: {"$and": [{"genre": {"$in": ["anime"]}}, {"rating": {"$gt": 8}}]}
+  query:  "recommend a movie"
+```
+
+#### Step 2 — Time Range Constructor
+
+For temporal queries ("latest", "most recent", "earliest"), the system:
+
+1. Creates a **tool-calling agent** with access to MongoDB
+2. The agent **queries the collection** to find actual min/max dates matching the existing filter
+3. Generates an additional date-range filter
+4. Merges it with Step 1's filter using `$and`
+
+**Example:**
+
+```
+Input:  filter={genre: anime}, query="latest anime movie"
+Agent:  Queries MongoDB → finds max(release_date) for anime = "2006-11-25"
+Output: time_filter={release_date: {$gte: "2006-11-25"}}
+Merged: {$and: [{genre: anime}, {release_date: {$gte: "2006-11-25"}}]}
+```
+
+#### Step 3 — Vector Search
+
+Using **MongoDB Atlas Vector Search**:
+
+1. The `pre_filter` narrows the candidate set (e.g., only anime movies after 2006)
+2. kNN search runs on the filtered subset using cosine similarity
+3. Top-k documents are returned
+
+This is the key advantage — instead of searching across ALL documents, vector search runs on a **pre-filtered subset**, giving much more relevant results.
+
+---
+
+## 4. Implementation
+
+### Project Structure
+
+```
+SmartFilteringRAG/
+├── app.py                          # 🎨 Streamlit UI (main entry point)
+├── config/
+│   └── config.yaml                 # ⚙️ Model, database, and embedding config
+├── rag/
+│   ├── __init__.py
+│   ├── auto_metadata.py            # 🧬 LLM-based schema extraction for uploaded datasets
+│   ├── config_loader.py            # 📄 YAML config loader
+│   ├── ingest.py                   # 📥 Dynamic dataset ingestion pipeline
+│   ├── initialize_mongo_collection.py  # 🏗️ Seeds DB with sample movie data
+│   ├── main.py                     # 🔧 CLI-based RAG pipeline (original)
+│   ├── metadata_filter.py          # 🧠 Core: Query Constructor + Time Range Filter
+│   ├── prompts.py                  # 📝 LLM prompt templates and examples
+│   ├── query_resolver.py           # 🔗 Multi-turn conversation resolver
+│   ├── tools.py                    # 🔨 MongoDB aggregation executor tools
+│   └── utils/
+│       ├── mongodb_helper.py       # 🔌 MongoDB connection + index creation
+│       └── prepare_test_data.py    # 🎬 Sample movie dataset + metadata schema
+├── .env                            # 🔑 API keys and MongoDB URI
+├── requirements.txt                # 📦 Python dependencies
+├── sample_products.csv             # 🛍️ Sample e-commerce dataset for testing upload
+└── README.md                       # 📖 This file
+```
+
+### Key Files Explained
+
+| File | Role |
+|------|------|
+| `metadata_filter.py` | **Core pipeline logic.** Contains the `MetadataFilter` class that orchestrates Query Constructor → Translator → Time Range Filter |
+| `query_resolver.py` | **Conversation memory.** Detects follow-up queries and rewrites them into self-contained versions |
+| `auto_metadata.py` | **Schema extraction.** Sends sample data to the LLM and gets back field types, descriptions, and content column identification |
+| `ingest.py` | **Dynamic ingestion.** Converts any DataFrame into embedded documents in MongoDB with proper vector search index |
+| `app.py` | **UI layer.** Premium dark-themed Streamlit app with glassmorphism design, filter transparency, latency metrics, file upload, and chat interface |
+| `prompts.py` | **Prompt engineering.** Contains schema prompts, few-shot examples, and system prompts for the LLM |
+| `tools.py` | **MongoDB tools.** Provides `QueryExecutorMongoDBTool` that the time-range agent uses to query the database |
+
+### Data Flow
+
+```mermaid
+graph LR
+    A[User Query] --> B[Query Resolver]
+    B --> C[Query Constructor]
+    C --> D[MongoDB Translator]
+    D --> E[Time Range Agent]
+    E --> F[Vector Search]
+    F --> G[Results]
+    
+    H[Uploaded CSV/JSON] --> I[Auto Schema Detection]
+    I --> J[Ingestion Pipeline]
+    J --> K[MongoDB Atlas]
+    K --> F
+```
+
+---
+
+## 5. Concepts Used
+
+### 5.1 RAG (Retrieval-Augmented Generation)
+
+RAG combines **retrieval** (finding relevant documents) with **generation** (using an LLM to answer questions). SmartFilteringRAG enhances the retrieval step with metadata-aware pre-filtering.
+
+### 5.2 Vector Embeddings
+
+Text is converted into **high-dimensional vectors** (numbers) using the `sentence-transformers/all-MiniLM-L6-v2` model. Similar texts produce similar vectors, enabling semantic search.
+
+- **384 dimensions** per embedding
+- **Cosine similarity** for comparison
+- **Runs locally** — no API calls needed for embeddings
+
+### 5.3 MongoDB Atlas Vector Search
+
+MongoDB Atlas provides **knnVector** index type that enables:
+
+- **Pre-filtering**: Apply structured `$match` filters BEFORE vector search
+- **kNN search**: Find k-nearest neighbors in vector space
+- Combined: narrowed search = faster + more relevant results
+
+### 5.4 LangChain Query Constructor
+
+LangChain's `load_query_constructor_runnable` is a chain that:
+
+1. Takes a **metadata schema** (field names, types, allowed values)
+2. Takes a **user query** in natural language
+3. Returns a **StructuredQuery** with `filter` and `query` components
+
+The filter is then translated to MongoDB syntax using `MongoDBAtlasTranslator`.
+
+### 5.5 Tool-Calling Agents
+
+For time-range resolution, the system uses a **LangChain Agent** with:
+
+- A custom tool (`QueryExecutorMongoDBTool`) that runs MongoDB aggregation pipelines
+- The agent decides what MongoDB queries to run to find date boundaries
+- This allows resolving "latest" → actual date values from the data
+
+### 5.6 Multi-Turn Conversation Memory
+
+The Query Resolver maintains conversation state:
+
+- **Last 3 turns** of history (query + filters used)
+- **Active filters** from the most recent successful query
+- LLM classifies each new query as fresh/follow-up with 6 few-shot examples
+
+### 5.7 Dynamic Schema Detection
+
+For uploaded datasets, the LLM automatically:
+
+- Identifies the **content column** (main text for semantic search)
+- Classifies all other columns as **metadata fields** with proper types
+- Maps types to Atlas index field types (`string → token`, `float → number`)
+
+---
+
+## 6. Final Results
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| 🔎 **Smart Filtering** | Automatically extracts metadata filters from natural language queries |
+| ⏰ **Time Range Resolution** | Handles "latest", "most recent", "earliest" using actual data boundaries |
+| 🔗 **Conversation Memory** | Follow-up queries carry forward filters from previous turns |
+| 📤 **Dataset Upload** | Upload any CSV/JSON → auto-detect schema → ingest → query |
+| 🧬 **Auto Schema Detection** | LLM analyzes uploaded data and identifies field types automatically |
+| 🎯 **Filter Transparency** | Expandable panel showing exactly what filters were generated at each step |
+| ⚡ **Latency Breakdown** | Per-step timing: resolution, filter generation, time-range, retrieval |
+| 🎨 **Premium UI** | Dark theme, glassmorphism cards, gradient accents, smooth animations |
+
+### Example Queries
+
+**With the default movie dataset:**
+
+| Query | Filters Generated |
+|-------|-------------------|
+| "show me anime movies" | `{genre: {$in: ["anime"]}}` |
+| "thriller rated above 8" | `{$and: [{genre: {$in: ["thriller"]}}, {rating: {$gt: 8}}]}` |
+| "latest movie by Christopher Nolan" | `{director: "Christopher Nolan"}` + time-range filter |
+
+**Multi-turn conversation:**
+
+```
+Turn 1: "anime movies"              → {genre: anime}
+Turn 2: "directed by Satoshi Kon"   → rewrites to "anime movies by Satoshi Kon"
+Turn 3: "show me more"              → reuses all filters, new vector results
+Turn 4: "recommend a comedy"        → fresh query, all filters reset
+```
+
+**With a custom uploaded dataset (e.g., products):**
+
+| Query | Filters Generated |
+|-------|-------------------|
+| "electronics under $500" | `{$and: [{category: "Electronics"}, {price: {$lt: 500}}]}` |
+| "same but from Apple" | rewrites to "Apple electronics under $500" |
+
+---
+
+## 7. How to Run This Project
+
+### Prerequisites
+
+- **Python 3.11+**
+- **MongoDB Atlas** account (free tier works)
+- **Groq API key** (free at [console.groq.com](https://console.groq.com))
+
+### Step 1 — Clone & Install
+
 ```bash
-database_name: <your database name>
-collection_name: <your collection name>
+git clone https://github.com/your-username/SmartFilteringRAG.git
+cd SmartFilteringRAG
+
+pip install -r requirements.txt
+```
+
+### Step 2 — Configure Environment
+
+Create a `.env` file in the project root:
+
+```env
+# MongoDB Atlas connection string
+MONGO_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/?appName=Cluster0
+
+# Groq API key (used as OpenAI-compatible endpoint)
+OPEN_AI_API_KEY=gsk_your_groq_api_key_here
+
+# Groq API base URL
+OPEN_API_BASE=https://api.groq.com/openai/v1
+
+# Optional — leave empty if not needed
+OPEN_API_DEFAULT_HEADERS=
+```
+
+### Step 3 — Configure Model (Optional)
+
+Edit `config/config.yaml` to change the LLM model:
+
+```yaml
+database_name: test-smart-filtering
+collection_name: test-smart-filtering
 vector_index_name: default
-embedding_model_dimensions: 1536
+embedding_model_dimensions: 384
 similarity: cosine
-model: gpt-4o
-embedding_model: text-embedding-ada-002
+model: llama-3.3-70b-versatile          # Groq model name
+embedding_model: sentence-transformers/all-MiniLM-L6-v2
 ```
-Set the environment variables
+
+### Step 4 — Initialize the Database
+
+This seeds MongoDB with 5 sample movie documents and creates the vector search index:
+
 ```bash
-export OPEN_AI_API_KEY = ""
-export OPEN_API_BASE = ""
-# headers are optional
-export OPEN_API_DEFAULT_HEADERS=""
-
-export MONGO_URI=""
+python -m rag.initialize_mongo_collection
 ```
-Initialize the mongodb collection with sample data. 
-This command will index some sample data and also create vector search index on the collection. 
+
+> **Note:** The embedding model (~90MB) will be downloaded on first run. The Atlas vector search index takes ~30 seconds to become active after creation.
+
+### Step 5 — Launch the App
+
 ```bash
-python3 rag/initialize_mongo_collection.py
+streamlit run app.py
 ```
 
-## Usage
-```bash
-python3 rag/main.py --queries <list of queries in json format>
-```
+Open your browser at `http://localhost:8501` and start querying!
 
-## Example
-```bash
-python3 rag/main.py --queries '["I want to watch an anime genre movie", "Recommend a thriller or action movie release after Feb, 2010", "Recommend an anime movie released before 2023 with the latest release date"]'
-```
-Generated Pre_filters:
+### Step 6 — Try Custom Datasets (Optional)
 
-Input Query: ```"I want to watch an anime genre movie", "Recommend a thriller or action movie release after Feb, 2010"```
+1. Click **📤 Upload Your Dataset** in the sidebar
+2. Upload a CSV or JSON file (try the included `sample_products.csv`)
+3. Click **🔍 Detect Schema** — the LLM auto-detects field types
+4. Review and edit the schema if needed
+5. Click **✅ Confirm & Ingest**
+6. Wait ~30 seconds for the index to activate
+7. Query your dataset!
 
-Output: ![generated_pre_filter](images/output_1.png)
+---
 
-Input Query: ```"Recommend a thriller or action movie release after Feb, 2010"```
+### Common Issues
 
-Output: ![generated_pre_filter](images/output_2.png)
+| Issue | Fix |
+|-------|-----|
+| `ModuleNotFoundError: No module named 'rag'` | Use `python -m rag.initialize_mongo_collection` (not `python rag/...`) |
+| `KeyError: 'MONGO_URI'` | Make sure `.env` file exists with `MONGO_URI` set |
+| `Error 402: requires more credits` | Switch to a free model (Groq models are free) |
+| `Path 'X' needs to be indexed as token` | Re-run `python -m rag.initialize_mongo_collection` to rebuild the index |
+| `torchvision` warnings | Harmless — ignore them. They come from Streamlit's file watcher scanning the transformers library |
 
-Input Query: ```"Recommend an anime movie released before 2023 with the latest release date"```
+---
 
-Output: ![generated_pre_filter](images/output_3.png)
+### Tech Stack
 
+| Component | Technology |
+|-----------|------------|
+| **LLM** | Groq (Llama 3.3 70B) via OpenAI-compatible API |
+| **Embeddings** | HuggingFace `all-MiniLM-L6-v2` (local, free) |
+| **Vector Database** | MongoDB Atlas Vector Search |
+| **Framework** | LangChain (Query Constructor, Agents, Translators) |
+| **UI** | Streamlit with custom CSS (glassmorphism dark theme) |
+| **Language** | Python 3.11+ |
 
-## Benefits Of Smart Filtering
+---
 
-Smart Filtering brings a host of advantages to the table, making it a valuable tool for enhancing search experiences:
-- **Improved Search Accuracy:** By precisely targeting the data that matches your query, Smart Filtering dramatically increases the likelihood of finding relevant results. No more wading through irrelevant information.
-
-- **Faster Search Results:** Since Smart Filtering narrows down the search scope, the system can process information more efficiently, leading to quicker results.
-
-- **Enhanced User Experience:** When users find what they're looking for quickly and easily, it leads to higher satisfaction and a better overall experience.
-
-- **Versatility:** Smart Filtering can be applied to various domains, from e-commerce product searches to content recommendations, making it a versatile tool.
-
-By leveraging metadata and creating targeted pre-filters, Smart Filtering empowers you to deliver search results that truly meet user expectations.
-
-## Conclusion
-Smart Filtering is a powerful tool that transforms  experiences by bridging the gap between user intent and  results. By harnessing the power of metadata and vector search, it delivers more accurate, relevant, and efficient search outcomes.
-
-Whether you're building an e-commerce platform, a content recommendation system, or any application that relies on effective search, incorporating Smart Filtering can significantly enhance user satisfaction and drive better results.
-
-By understanding the fundamentals of Smart Filtering, you're equipped to explore its potential and implement it in your projects. So why wait? Start leveraging the power of Smart Filtering today and revolutionize your search game!
-
-## Credit
-Inspired by LangChain's [Self Query Retriever](https://python.langchain.com/v0.1/docs/integrations/retrievers/self_query/mongodb_atlas/).
+<p align="center">
+  Built with ❤️ using LangChain, MongoDB Atlas, and Streamlit
+</p>
