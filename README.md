@@ -123,61 +123,79 @@ Forcing all data into a single vector pipeline is an anti-pattern in production 
 
 ```mermaid
 flowchart TD
-    User([User Query]) --> UI[Streamlit UI - app.py]
-    UI --> Rehydrate[Persistence Layer: Rehydrate Session]
-    Rehydrate --> LG[LangGraph Orchestration Graph - rag/graph.py]
-
-    subgraph LangGraph State Machine
-        Entry[resolve_query / slot_memory] --> Branch1{Ambiguous?}
-        Branch1 -- Yes --> Clarify[clarify_node -> Ask User]
-        Clarify --> UI
-
-        Branch1 -- No --> ModeCheck{Query Mode?}
-        
-        %% Document Branch
-        ModeCheck -- Document Mode --> RetrieveDoc[vector_search without pre-filter]
-
-        %% Structured Branch
-        ModeCheck -- Structured Mode --> KeepCheck{filter_action == 'keep_all'?}
-        KeepCheck -- Yes --> CarryFilter[carry_filters_node] --> RetrieveStruct
-        KeepCheck -- No --> DetectConstr[detect_constraints_node]
-        
-        DetectConstr --> HasConstr{Has Constraints?}
-        HasConstr -- No --> RetrieveStruct[vector_search: Pure Vector]
-        HasConstr -- Yes --> GenFilter[generate_filter: MetadataFilter]
-        
-        GenFilter --> TimeCheck{Temporal Keyword?}
-        TimeCheck -- Yes --> TimeAgent[QueryExecutorMongoDBTool + Agent]
-        TimeAgent --> MergeFilter[Merge Step 1 + Step 2 Filters]
-        TimeCheck -- No --> MergeFilter
-        
-        MergeFilter --> RetrieveStruct[vector_search: Atlas Pre-Filter]
-
-        RetrieveStruct --> EmptyCheck{Zero Docs & Filter Applied?}
-        EmptyCheck -- Yes & Retries < Max --> RelaxFilter[relax_filter_node]
-        RelaxFilter --> RetrieveStruct
-        EmptyCheck -- No --> Synth[synthesize_answer_node]
-        RetrieveDoc --> Synth
+    subgraph Layer1 ["1. Presentation & State Layer (app.py)"]
+        User(["👤 User Query"]) --> UI["Streamlit UI (Dual-Mode Interface)"]
+        UI --> Session["Session Persistence / Rehydration (rag/persistence.py)"]
     end
 
-    subgraph Database Layer [MongoDB Atlas Cluster]
-        CollectionStruct[(Structured Collection)]
-        CollectionDocs[(Documents Store)]
-        IndexStruct[Atlas Vector Search Index + Filter Mappings]
-        IndexDocs[Atlas Vector Search Index]
-        PersistColl[(conversation_logs)]
+    Session --> Entry["Initialize PipelineState"]
+    Entry --> ResolveNode
+
+    subgraph Layer2 ["2. Agentic Orchestration State Machine (LangGraph - rag/graph.py)"]
+        ResolveNode["resolve<br/>(rag/slot_memory.py | rag/query_resolver.py)"]
+        
+        ResolveNode --> AmbiguousCheck{"Ambiguous<br/>Follow-Up?"}
+        AmbiguousCheck -- Yes --> ClarifyNode["clarify<br/>(Ask User for Context)"]
+        
+        AmbiguousCheck -- No --> ModeCheck{"Active Query<br/>Mode?"}
+        
+        %% Unstructured Document Flow
+        ModeCheck -- "📄 Document Mode" --> RetrieveNode
+        
+        %% Structured Dataset Flow
+        ModeCheck -- "📊 Structured Mode" --> ActionCheck{"filter_action ==<br/>'keep_all'?"}
+        ActionCheck -- Yes --> CarryNode["carry_filters<br/>(Reuse Prior Filter)"] --> RetrieveNode
+        ActionCheck -- No --> DetectNode["detect_constraints<br/>(Analyze Query Intent)"]
+        
+        DetectNode --> ConstrCheck{"Has Structured<br/>Constraints?"}
+        ConstrCheck -- No --> RetrieveNode
+        ConstrCheck -- Yes --> FilterNode["generate_filter<br/>(LangChain Query Constructor)"]
+        
+        FilterNode --> TimeCheck{"Temporal Keyword?<br/>('latest' / 'recent')"}
+        TimeCheck -- Yes --> TimeAgent["time_range_filter<br/>(QueryExecutorMongoDBTool)"]
+        TimeCheck -- No --> CompileFilter["Compile Final MongoDB Filter"]
+        TimeAgent --> CompileFilter
+        CompileFilter --> RetrieveNode
+        
+        %% Retrieval & Dynamic Relaxation Loop
+        RetrieveNode["retrieve<br/>(Atlas Vector Search with pre_filter)"]
+        
+        RetrieveNode --> EmptyCheck{"Documents<br/>Retrieved?"}
+        EmptyCheck -- "0 Docs & Filter Active<br/>(Retries < Max)" --> RelaxNode["relax<br/>(Heuristic Filter Widening)"]
+        RelaxNode --> RetrieveNode
+        
+        EmptyCheck -- "Docs Found OR<br/>Relaxation Exhausted" --> SynthNode["synthesize<br/>(Answer Generation & Citations)"]
     end
 
-    RetrieveStruct <--> CollectionStruct
-    RetrieveDoc <--> CollectionDocs
-    TimeAgent <--> CollectionStruct
+    subgraph Layer3 ["3. Unified Database & Vector Index (MongoDB Atlas)"]
+        direction TB
+        AtlasCluster[("MongoDB Atlas Cluster")]
+        StructColl[("test-smart-filtering<br/>(Structured Records + Vector Index)")]
+        DocColl[("documents-store<br/>(PDF/DOCX Chunks + Vector Index)")]
+        LogsColl[("conversation_logs<br/>(Session Turns & Execution Traces)")]
+        
+        AtlasCluster --- StructColl
+        AtlasCluster --- DocColl
+        AtlasCluster --- LogsColl
+    end
 
-    Synth --> LLMGen[Answer Synthesis LLM - Groq / Llama 3.3]
-    LLMGen --> AuditLLM[Faithfulness Auditor - Gemini 3.1 Flash / Groq]
-    AuditLLM --> LogTurn[log_turn -> persistence.py]
-    LogTurn --> PersistColl
-    LogTurn --> FinalResponse([Final Answer + Citations + Trace + Metrics])
-    FinalResponse --> UI
+    subgraph Layer4 ["4. Generation, Grounding Audit & Response Delivery"]
+        GenLLM["Grounded Answer Synthesis<br/>(Groq: Llama 3.3 70B / GPT-OSS 120B)<br/>• Synthesizes response from retrieved context<br/>• Generates inline citations [Doc p.X]"]
+        AuditLLM["Faithfulness Auditor<br/>(Gemini 3.1 Flash / Groq)<br/>• Independent NLI claim verification<br/>• Scores grounding & flags unsupported claims"]
+        LogStep["Persist Turn Log<br/>(rag/persistence.py)"]
+        FinalPayload["Render Results in Streamlit UI<br/>• Verified Answer with Grounding Badge<br/>• Document Citation Cards<br/>• Interactive Agent Execution Trace<br/>• Latency Breakdown Panel"]
+    end
+
+    %% Cross-layer interactions
+    TimeAgent -.->|"Aggregation ($sort, $limit)"| StructColl
+    RetrieveNode -.->|"Atlas $vectorSearch"| AtlasCluster
+    SynthNode --> GenLLM
+    GenLLM --> AuditLLM
+    AuditLLM --> LogStep
+    LogStep -.->|"Insert Turn Doc"| LogsColl
+    LogStep --> FinalPayload
+    ClarifyNode --> FinalPayload
+    FinalPayload --> UI
 ```
 
 ### Unstructured Document Pipeline Architecture
