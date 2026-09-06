@@ -1,7 +1,0 @@
-database_name: test-db
-collection_name: test-smart-filtering
-vector_index_name: default
-embedding_model_dimensions: 384
-similarity: cosine
-model: llama-3.3-70b-versatile
-embedding_model: sentence-transformers/all-MiniLM-L6-v2

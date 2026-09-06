@@ -1,0 +1,40 @@
+database_name: test-db
+collection_name: test-smart-filtering
+vector_index_name: default
+embedding_model_dimensions: 384
+similarity: cosine
+# NOTE: llama-3.3-70b-versatile returns 404 (no access) on the current Groq key,
+# and llama3-*/mixtral/gemma2 are decommissioned. openai/gpt-oss-120b is the
+# available model on this key that also supports tool calling, which the
+# time-range filter agent requires.
+model: openai/gpt-oss-120b
+embedding_model: sentence-transformers/all-MiniLM-L6-v2
+
+# ── Unstructured document ingestion (PDF / DOCX) ──────────────────────────
+document_collection_name: documents-store
+chunk_size: 1000
+chunk_overlap: 150
+
+# ── Answer synthesis + faithfulness check ─────────────────────────────────
+enable_answer_synthesis: true
+enable_faithfulness_check: true
+
+# Auditor model for the faithfulness check. Kept here (not hardcoded) because
+# Gemini model IDs are being deprecated/replaced quickly - change it here.
+# Credentials for it live in .env (FAITHFULNESS_API_KEY / FAITHFULNESS_API_BASE).
+# The FAITHFULNESS_MODEL env var, if set, still overrides this value.
+faithfulness_model: gemini-3.1-flash-lite
+
+# ── Agentic orchestration (LangGraph) ─────────────────────────────────────
+max_filter_relaxations: 2
+enable_clarification: true
+
+# Slot-based multi-turn memory (rag/slot_memory.py). When false, or when the
+# active mode has no metadata schema (document mode), the original
+# rag/query_resolver.py follow-up logic is used instead.
+enable_slot_memory: true
+
+# ── Conversation persistence (MongoDB) ────────────────────────────────────
+# Collection storing every turn so a browser session survives a reload.
+# CONVERSATION_COLLECTION_NAME in .env overrides this.
+conversation_collection_name: conversation_logs

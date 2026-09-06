@@ -1,0 +1,25 @@
+pymongo==4.7.2
+# Bumped from 0.2.6 to satisfy langgraph 0.1.19 (needs >=0.2.27).
+# Still 0.2.x, so it stays within the ranges langchain / langchain-community /
+# langchain-openai below require (<0.3).
+langchain-core==0.2.43
+langchain-openai==0.1.7
+langchain==0.2.1
+langchain-community==0.2.4
+lark==1.1.9
+PyYAML==6.0.1
+fire==0.6.0
+streamlit>=1.35.0
+python-dotenv>=1.0.0
+langchain-huggingface>=0.0.3
+sentence-transformers>=2.7.0
+
+# ── Agentic orchestration (LangGraph) ────────────────────────────────────────
+# Pinned to 0.1.x: langgraph >= 0.2 requires langchain-core >= 0.3, which is
+# incompatible with the pinned langchain / langchain-community 0.2.x above.
+langgraph==0.1.19
+langchain-text-splitters>=0.2.0
+
+# ── Unstructured document ingestion (PDF / DOCX) ─────────────────────────────
+pypdf>=4.2.0
+python-docx>=1.1.0

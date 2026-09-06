@@ -1,0 +1,505 @@
+{
+  "version": "1.0",
+  "description": "Evaluation set for SmartFilteringRAG. Structured cases run against the 'eval-movies' corpus seeded by eval/seed_eval_data.py; document cases run against 'eval-documents'. expected_docs are matched by title/keyword appearing in the retrieved document's text.",
+  "collections": {
+    "structured": "eval-movies",
+    "documents": "eval-documents"
+  },
+  "cases": [
+    {
+      "id": "simple-01",
+      "category": "simple_filter",
+      "mode": "structured",
+      "turns": [
+        {
+          "query": "show me anime movies",
+          "expected_filter": {"genre": {"$in": ["anime"]}},
+          "expected_slots": {"genre": {"operator": "in", "value": ["anime"]}},
+          "expected_docs": ["Paprika", "Perfect Blue", "Akira", "My Neighbor Totoro", "Spirited Away", "Grave of the Fireflies"],
+          "expected_answer_contains": ["anime"]
+        }
+      ]
+    },
+    {
+      "id": "simple-02",
+      "category": "simple_filter",
+      "mode": "structured",
+      "turns": [
+        {
+          "query": "movies directed by Christopher Nolan",
+          "expected_filter": {"director": {"$eq": "Christopher Nolan"}},
+          "expected_slots": {"director": {"operator": "eq", "value": "Christopher Nolan"}},
+          "expected_docs": ["Inception", "The Prestige", "Memento", "Interstellar"],
+          "expected_answer_contains": ["Nolan"]
+        }
+      ]
+    },
+    {
+      "id": "simple-03",
+      "category": "simple_filter",
+      "mode": "structured",
+      "turns": [
+        {
+          "query": "show me comedy films",
+          "expected_filter": {"genre": {"$in": ["comedy"]}},
+          "expected_slots": {"genre": {"operator": "in", "value": ["comedy"]}},
+          "expected_docs": ["Lady Bird", "Toy Story", "Groundhog Day", "The Grand Budapest Hotel"],
+          "expected_answer_contains": ["comedy"]
+        }
+      ]
+    },
+    {
+      "id": "simple-04",
+      "category": "simple_filter",
+      "mode": "structured",
+      "turns": [
+        {
+          "query": "films rated above 8.5",
+          "expected_filter": {"rating": {"$gt": 8.5}},
+          "expected_slots": {"rating": {"operator": "gt", "value": 8.5}},
+          "expected_docs": ["Paprika", "Spirited Away", "Inception", "Interstellar"],
+          "expected_answer_contains": ["8"]
+        }
+      ]
+    },
+    {
+      "id": "simple-05",
+      "category": "simple_filter",
+      "mode": "structured",
+      "turns": [
+        {
+          "query": "movies by Hayao Miyazaki",
+          "expected_filter": {"director": {"$eq": "Hayao Miyazaki"}},
+          "expected_slots": {"director": {"operator": "eq", "value": "Hayao Miyazaki"}},
+          "expected_docs": ["My Neighbor Totoro", "Spirited Away"],
+          "expected_answer_contains": ["Miyazaki"]
+        }
+      ]
+    },
+    {
+      "id": "simple-06",
+      "category": "simple_filter",
+      "mode": "structured",
+      "turns": [
+        {
+          "query": "show me thriller movies",
+          "expected_filter": {"genre": {"$in": ["thriller"]}},
+          "expected_slots": {"genre": {"operator": "in", "value": ["thriller"]}},
+          "expected_docs": ["Paprika", "Perfect Blue", "Inception", "The Prestige", "Memento", "Parasite"],
+          "expected_answer_contains": ["thriller"]
+        }
+      ]
+    },
+
+    {
+      "id": "compound-01",
+      "category": "compound_filter",
+      "mode": "structured",
+      "turns": [
+        {
+          "query": "anime movies released before 1990",
+          "expected_filter": {"$and": [{"genre": {"$in": ["anime"]}}, {"release_date": {"$lt": "1990-01-01"}}]},
+          "expected_slots": {
+            "genre": {"operator": "in", "value": ["anime"]},
+            "release_date": {"operator": "lt", "value": "1990-01-01"}
+          },
+          "expected_docs": ["Akira", "My Neighbor Totoro", "Grave of the Fireflies"],
+          "expected_answer_contains": ["1988"]
+        }
+      ]
+    },
+    {
+      "id": "compound-02",
+      "category": "compound_filter",
+      "mode": "structured",
+      "turns": [
+        {
+          "query": "thriller movies by Christopher Nolan",
+          "expected_filter": {"$and": [{"genre": {"$in": ["thriller"]}}, {"director": {"$eq": "Christopher Nolan"}}]},
+          "expected_slots": {
+            "genre": {"operator": "in", "value": ["thriller"]},
+            "director": {"operator": "eq", "value": "Christopher Nolan"}
+          },
+          "expected_docs": ["Inception", "The Prestige", "Memento"],
+          "expected_answer_contains": ["Nolan"]
+        }
+      ]
+    },
+    {
+      "id": "compound-03",
+      "category": "compound_filter",
+      "mode": "structured",
+      "turns": [
+        {
+          "query": "anime films rated above 8.4",
+          "expected_filter": {"$and": [{"genre": {"$in": ["anime"]}}, {"rating": {"$gt": 8.4}}]},
+          "expected_slots": {
+            "genre": {"operator": "in", "value": ["anime"]},
+            "rating": {"operator": "gt", "value": 8.4}
+          },
+          "expected_docs": ["Paprika", "Spirited Away", "Grave of the Fireflies"],
+          "expected_answer_contains": ["anime"]
+        }
+      ]
+    },
+    {
+      "id": "compound-04",
+      "category": "compound_filter",
+      "mode": "structured",
+      "turns": [
+        {
+          "query": "drama movies released after 2010",
+          "expected_filter": {"$and": [{"genre": {"$in": ["drama"]}}, {"release_date": {"$gt": "2010-01-01"}}]},
+          "expected_slots": {
+            "genre": {"operator": "in", "value": ["drama"]},
+            "release_date": {"operator": "gt", "value": "2010-01-01"}
+          },
+          "expected_docs": ["Little Women", "Lady Bird", "Parasite", "Whiplash", "Interstellar"],
+          "expected_answer_contains": ["20"]
+        }
+      ]
+    },
+    {
+      "id": "compound-05",
+      "category": "compound_filter",
+      "mode": "structured",
+      "turns": [
+        {
+          "query": "scifi movies rated at least 8.5 released after 2000",
+          "expected_filter": {"$and": [{"genre": {"$in": ["scifi"]}}, {"rating": {"$gte": 8.5}}, {"release_date": {"$gt": "2000-01-01"}}]},
+          "expected_slots": {
+            "genre": {"operator": "in", "value": ["scifi"]},
+            "rating": {"operator": "gte", "value": 8.5},
+            "release_date": {"operator": "gt", "value": "2000-01-01"}
+          },
+          "expected_docs": ["Paprika", "Inception", "Interstellar"],
+          "expected_answer_contains": ["scifi", "sci"]
+        }
+      ]
+    },
+
+    {
+      "id": "temporal-01",
+      "category": "temporal",
+      "mode": "structured",
+      "turns": [
+        {
+          "query": "what is the latest anime movie",
+          "expected_filter": {"genre": {"$in": ["anime"]}},
+          "expected_slots": {"genre": {"operator": "in", "value": ["anime"]}},
+          "expected_docs": ["Paprika", "Spirited Away"],
+          "expected_answer_contains": ["200"]
+        }
+      ]
+    },
+    {
+      "id": "temporal-02",
+      "category": "temporal",
+      "mode": "structured",
+      "turns": [
+        {
+          "query": "the most recent Christopher Nolan film",
+          "expected_filter": {"director": {"$eq": "Christopher Nolan"}},
+          "expected_slots": {"director": {"operator": "eq", "value": "Christopher Nolan"}},
+          "expected_docs": ["Interstellar"],
+          "expected_answer_contains": ["Interstellar", "2014"]
+        }
+      ]
+    },
+    {
+      "id": "temporal-03",
+      "category": "temporal",
+      "mode": "structured",
+      "turns": [
+        {
+          "query": "the earliest anime in the collection",
+          "expected_filter": {"genre": {"$in": ["anime"]}},
+          "expected_slots": {"genre": {"operator": "in", "value": ["anime"]}},
+          "expected_docs": ["Akira", "My Neighbor Totoro", "Grave of the Fireflies"],
+          "expected_answer_contains": ["1988"]
+        }
+      ]
+    },
+    {
+      "id": "temporal-04",
+      "category": "temporal",
+      "mode": "structured",
+      "turns": [
+        {
+          "query": "movies from the 1990s",
+          "expected_filter": {"$and": [{"release_date": {"$gte": "1990-01-01"}}, {"release_date": {"$lt": "2000-01-01"}}]},
+          "expected_slots": {"release_date": {"operator": "gte", "value": "1990-01-01"}},
+          "expected_docs": ["Perfect Blue", "Toy Story", "Jurassic Park", "Groundhog Day"],
+          "expected_answer_contains": ["199"]
+        }
+      ]
+    },
+
+    {
+      "id": "semantic-01",
+      "category": "semantic_only",
+      "mode": "structured",
+      "turns": [
+        {
+          "query": "something heartwarming about family and growing up",
+          "expected_filter": {},
+          "expected_slots": {},
+          "expected_docs": ["Little Women", "Lady Bird", "My Neighbor Totoro", "Grave of the Fireflies"],
+          "expected_answer_contains": []
+        }
+      ]
+    },
+    {
+      "id": "semantic-02",
+      "category": "semantic_only",
+      "mode": "structured",
+      "turns": [
+        {
+          "query": "a story about obsession and pushing yourself too hard",
+          "expected_filter": {},
+          "expected_slots": {},
+          "expected_docs": ["Whiplash", "The Prestige", "Perfect Blue"],
+          "expected_answer_contains": []
+        }
+      ]
+    },
+    {
+      "id": "semantic-03",
+      "category": "semantic_only",
+      "mode": "structured",
+      "turns": [
+        {
+          "query": "films about dreams and altered reality",
+          "expected_filter": {},
+          "expected_slots": {},
+          "expected_docs": ["Paprika", "Inception", "Perfect Blue", "Memento"],
+          "expected_answer_contains": ["dream"]
+        }
+      ]
+    },
+
+    {
+      "id": "followup-01",
+      "category": "followup",
+      "mode": "structured",
+      "description": "Add a constraint, then a second, without losing the first.",
+      "turns": [
+        {
+          "query": "show me anime movies",
+          "expected_filter": {"genre": {"$in": ["anime"]}},
+          "expected_slots": {"genre": {"operator": "in", "value": ["anime"]}},
+          "expected_docs": ["Paprika", "Perfect Blue", "Akira", "My Neighbor Totoro", "Spirited Away", "Grave of the Fireflies"]
+        },
+        {
+          "query": "only ones released before 1990",
+          "expected_filter": {"$and": [{"genre": {"$in": ["anime"]}}, {"release_date": {"$lt": "1990-01-01"}}]},
+          "expected_slots": {
+            "genre": {"operator": "in", "value": ["anime"]},
+            "release_date": {"operator": "lt", "value": "1990-01-01"}
+          },
+          "expected_docs": ["Akira", "My Neighbor Totoro", "Grave of the Fireflies"],
+          "expected_answer_contains": ["1988"]
+        },
+        {
+          "query": "and rated above 8.2",
+          "expected_filter": {"$and": [{"genre": {"$in": ["anime"]}}, {"release_date": {"$lt": "1990-01-01"}}, {"rating": {"$gt": 8.2}}]},
+          "expected_slots": {
+            "genre": {"operator": "in", "value": ["anime"]},
+            "release_date": {"operator": "lt", "value": "1990-01-01"},
+            "rating": {"operator": "gt", "value": 8.2}
+          },
+          "expected_docs": ["Akira", "Grave of the Fireflies"]
+        }
+      ]
+    },
+    {
+      "id": "followup-02",
+      "category": "correction",
+      "mode": "structured",
+      "description": "Direction correction on a date bound; the genre slot must survive.",
+      "turns": [
+        {
+          "query": "show me anime movies",
+          "expected_filter": {"genre": {"$in": ["anime"]}},
+          "expected_slots": {"genre": {"operator": "in", "value": ["anime"]}},
+          "expected_docs": ["Paprika", "Perfect Blue", "Akira", "My Neighbor Totoro", "Spirited Away", "Grave of the Fireflies"]
+        },
+        {
+          "query": "released before 1990",
+          "expected_filter": {"$and": [{"genre": {"$in": ["anime"]}}, {"release_date": {"$lt": "1990-01-01"}}]},
+          "expected_slots": {
+            "genre": {"operator": "in", "value": ["anime"]},
+            "release_date": {"operator": "lt", "value": "1990-01-01"}
+          },
+          "expected_docs": ["Akira", "My Neighbor Totoro", "Grave of the Fireflies"]
+        },
+        {
+          "query": "no, I meant after 1990, not before",
+          "expected_filter": {"$and": [{"genre": {"$in": ["anime"]}}, {"release_date": {"$gt": "1990-01-01"}}]},
+          "expected_slots": {
+            "genre": {"operator": "in", "value": ["anime"]},
+            "release_date": {"operator": "gt", "value": "1990-01-01"}
+          },
+          "expect_correction_on": ["release_date"],
+          "expected_docs": ["Paprika", "Perfect Blue", "Spirited Away"],
+          "expected_answer_contains": ["199", "200"]
+        }
+      ]
+    },
+    {
+      "id": "followup-03",
+      "category": "correction",
+      "mode": "structured",
+      "description": "Genre correction mid-thread; the director slot must survive.",
+      "turns": [
+        {
+          "query": "thriller movies by Christopher Nolan",
+          "expected_filter": {"$and": [{"genre": {"$in": ["thriller"]}}, {"director": {"$eq": "Christopher Nolan"}}]},
+          "expected_slots": {
+            "genre": {"operator": "in", "value": ["thriller"]},
+            "director": {"operator": "eq", "value": "Christopher Nolan"}
+          },
+          "expected_docs": ["Inception", "The Prestige", "Memento"]
+        },
+        {
+          "query": "actually make it scifi instead",
+          "expected_filter": {"$and": [{"genre": {"$in": ["scifi"]}}, {"director": {"$eq": "Christopher Nolan"}}]},
+          "expected_slots": {
+            "genre": {"operator": "in", "value": ["scifi"]},
+            "director": {"operator": "eq", "value": "Christopher Nolan"}
+          },
+          "expect_correction_on": ["genre"],
+          "expected_docs": ["Inception", "Interstellar"],
+          "expected_answer_contains": ["Nolan"]
+        }
+      ]
+    },
+    {
+      "id": "followup-04",
+      "category": "correction",
+      "mode": "structured",
+      "description": "Clearing one slot must leave the others intact.",
+      "turns": [
+        {
+          "query": "anime movies rated above 8.4",
+          "expected_filter": {"$and": [{"genre": {"$in": ["anime"]}}, {"rating": {"$gt": 8.4}}]},
+          "expected_slots": {
+            "genre": {"operator": "in", "value": ["anime"]},
+            "rating": {"operator": "gt", "value": 8.4}
+          },
+          "expected_docs": ["Paprika", "Spirited Away", "Grave of the Fireflies"]
+        },
+        {
+          "query": "forget the rating",
+          "expected_filter": {"genre": {"$in": ["anime"]}},
+          "expected_slots": {"genre": {"operator": "in", "value": ["anime"]}},
+          "expect_cleared": ["rating"],
+          "expected_docs": ["Paprika", "Perfect Blue", "Akira", "My Neighbor Totoro", "Spirited Away", "Grave of the Fireflies"]
+        },
+        {
+          "query": "actually only Miyazaki ones",
+          "expected_filter": {"$and": [{"genre": {"$in": ["anime"]}}, {"director": {"$eq": "Hayao Miyazaki"}}]},
+          "expected_slots": {
+            "genre": {"operator": "in", "value": ["anime"]},
+            "director": {"operator": "eq", "value": "Hayao Miyazaki"}
+          },
+          "expected_docs": ["My Neighbor Totoro", "Spirited Away"],
+          "expected_answer_contains": ["Miyazaki"]
+        }
+      ]
+    },
+    {
+      "id": "followup-05",
+      "category": "followup",
+      "mode": "structured",
+      "description": "Topic change must reset slots rather than carry them.",
+      "turns": [
+        {
+          "query": "anime movies by Satoshi Kon",
+          "expected_filter": {"$and": [{"genre": {"$in": ["anime"]}}, {"director": {"$eq": "Satoshi Kon"}}]},
+          "expected_slots": {
+            "genre": {"operator": "in", "value": ["anime"]},
+            "director": {"operator": "eq", "value": "Satoshi Kon"}
+          },
+          "expected_docs": ["Paprika", "Perfect Blue"]
+        },
+        {
+          "query": "show me comedy films instead",
+          "expected_filter": {"genre": {"$in": ["comedy"]}},
+          "expected_slots": {"genre": {"operator": "in", "value": ["comedy"]}},
+          "expect_absent_slots": ["director"],
+          "expected_docs": ["Lady Bird", "Toy Story", "Groundhog Day", "The Grand Budapest Hotel"],
+          "expected_answer_contains": ["comedy"]
+        }
+      ]
+    },
+
+    {
+      "id": "doc-01",
+      "category": "document",
+      "mode": "documents",
+      "turns": [
+        {
+          "query": "How much did revenue grow?",
+          "expected_filter": {},
+          "expected_docs": ["Revenue grew 14 percent"],
+          "expected_answer_contains": ["14"]
+        }
+      ]
+    },
+    {
+      "id": "doc-02",
+      "category": "document",
+      "mode": "documents",
+      "turns": [
+        {
+          "query": "What was the operating margin?",
+          "expected_filter": {},
+          "expected_docs": ["Operating margin expanded to 22 percent"],
+          "expected_answer_contains": ["22"]
+        }
+      ]
+    },
+    {
+      "id": "doc-03",
+      "category": "document",
+      "mode": "documents",
+      "turns": [
+        {
+          "query": "What is the principal risk the company identified?",
+          "expected_filter": {},
+          "expected_docs": ["customer concentration"],
+          "expected_answer_contains": ["customer concentration"]
+        }
+      ]
+    },
+    {
+      "id": "doc-04",
+      "category": "document",
+      "mode": "documents",
+      "turns": [
+        {
+          "query": "How many people does the company employ and where is it based?",
+          "expected_filter": {},
+          "expected_docs": ["412 people"],
+          "expected_answer_contains": ["412", "Bristol"]
+        }
+      ]
+    },
+    {
+      "id": "doc-05",
+      "category": "document",
+      "mode": "documents",
+      "description": "Answer is genuinely absent — the system should decline, not invent.",
+      "turns": [
+        {
+          "query": "What was the CEO's total compensation last year?",
+          "expected_filter": {},
+          "expected_docs": [],
+          "expect_refusal": true,
+          "expected_answer_contains": []
+        }
+      ]
+    }
+  ]
+}
